@@ -1,0 +1,5 @@
+{
+  "name": "Creative Code AI",
+  "description": "Generate live, interactive animations from text prompts using AI. Describe the animation you want, and watch the p5.js code and a live preview appear.",
+  "requestFramePermissions": []
+}
