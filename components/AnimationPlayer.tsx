@@ -37,10 +37,65 @@ const DownloadIcon: React.FC = () => (
 type RecordConfig = { format: 'gif', duration: 5 } | { format: 'webm', duration: 10 };
 
 const createIframeContent = (code: string, recordConfig?: RecordConfig) => {
+    // FIX: This script intercepts console logs and errors inside the iframe and sends them to the parent window.
+    const consoleInterceptor = `
+        <script>
+          const formatArg = (arg) => {
+            if (arg instanceof Error) {
+              return arg.stack || arg.message;
+            }
+            if (typeof arg === 'object' && arg !== null) {
+              try {
+                // A simple stringify that handles functions
+                return JSON.stringify(arg, (key, value) => 
+                  typeof value === 'function' ? \`[Function: \${value.name || 'anonymous'}]\` : value);
+              } catch (e) {
+                return '[Unserializable Object]';
+              }
+            }
+            return String(arg);
+          };
+
+          const originalConsole = { ...console };
+          ['log', 'warn', 'error', 'info'].forEach(level => {
+            console[level] = (...args) => {
+              originalConsole[level](...args); // Keep logging to dev tools
+              const message = args.map(formatArg).join(' ');
+              window.parent.postMessage({
+                type: 'console',
+                level: level,
+                message: message
+              }, '*');
+            };
+          });
+
+          window.onerror = (message, source, lineno, colno, error) => {
+            originalConsole.error('Uncaught Error:', message, error);
+            const formattedMessage = error ? formatArg(error) : \`\${message} at line \${lineno}:\${colno}\`;
+            window.parent.postMessage({
+              type: 'console',
+              level: 'error',
+              message: \`Uncaught: \${formattedMessage}\`
+            }, '*');
+            return true; // Prevents the browser's default error handling
+          };
+
+          window.onunhandledrejection = (event) => {
+            originalConsole.warn('Unhandled Rejection:', event.reason);
+            window.parent.postMessage({
+              type: 'console',
+              level: 'warn',
+              message: \`Unhandled Promise Rejection: \${formatArg(event.reason)}\`
+            }, '*');
+          };
+        </script>
+    `;
+
     const standardHeader = `
       <!DOCTYPE html>
       <html>
         <head>
+          ${consoleInterceptor}
           <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/p5.js"></script>
           <script src="https://cdn.jsdelivr.net/npm/p5@1.9.0/lib/addons/p5.sound.min.js"></script>
           <style>
@@ -64,7 +119,10 @@ const createIframeContent = (code: string, recordConfig?: RecordConfig) => {
         return `
             ${standardHeader}
             <script>
-              try { ${code} } catch (e) { ${errorHandler} }
+              try { ${code} } catch (e) { 
+                console.error('Execution Error:', e);
+                ${errorHandler} 
+              }
             </script>
             ${standardFooter}
         `;
@@ -100,6 +158,7 @@ const createIframeContent = (code: string, recordConfig?: RecordConfig) => {
           try {
             ${modifiedCode}
           } catch (e) {
+            console.error('Execution Error:', e);
             ${errorHandler}
           }
 
@@ -203,7 +262,7 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ appState, animationCo
       <div className={
         isFullscreen 
           ? 'fixed inset-0 z-50 bg-gray-900 w-screen h-screen flex items-center justify-center' 
-          : 'aspect-video w-full bg-gray-800 border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center relative overflow-hidden'
+          : 'aspect-[9/16] w-full max-w-sm mx-auto bg-gray-800 border-2 border-dashed border-gray-700 rounded-lg flex items-center justify-center relative overflow-hidden'
       }>
         <PlayerContent appState={appState} animationCode={animationCode} error={error} recordConfig={recordConfig} />
         

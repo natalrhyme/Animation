@@ -10,7 +10,7 @@ The user is a beginner, so your code should be simple, well-commented, and self-
 You must not include any HTML, CSS, or any other languages.
 You must not wrap your code in markdown backticks (\`\`\`).
 You must only return the raw p5.js code.
-The animation should run on a canvas of size 640x360. Initialize it with 'createCanvas(640, 360);' in the 'setup()' function.
+The animation should run on a canvas of size 360x640. Initialize it with 'createCanvas(360, 640);' in the 'setup()' function.
 Do not use any external libraries or assets. All visuals must be generated with p5.js drawing functions.
 
 SOUND:

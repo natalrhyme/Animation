@@ -1,10 +1,11 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import PromptInput from './components/PromptInput';
 import CodeDisplay from './components/CodeDisplay';
 import AnimationPlayer from './components/AnimationPlayer';
 import ChatInput from './components/ChatInput';
+import ConsoleDisplay from './components/ConsoleDisplay';
 import { generateAnimationCode, refineCodeWithChat } from './services/geminiService';
-import { AppState, ChatMessage } from './types';
+import { AppState, ChatMessage, ConsoleMessage } from './types';
 
 // FIX: Implement the main App component to structure the application UI and logic.
 function App() {
@@ -12,9 +13,25 @@ function App() {
   const [animationCode, setAnimationCode] = useState('');
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
   const [appState, setAppState] = useState<AppState>(AppState.IDLE);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // FIX: Listen for console messages posted from the animation iframe.
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'console') {
+        const { level, message } = event.data;
+        setConsoleMessages(prev => [...prev, { level, message }]);
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) return;
@@ -24,6 +41,7 @@ function App() {
     setAnimationCode('');
     setChatHistory([]); // Reset chat history
     setChatMessage('');
+    setConsoleMessages([]); // Reset console messages
 
     try {
       const code = await generateAnimationCode(prompt);
@@ -53,6 +71,7 @@ function App() {
 
     setAppState(AppState.REFINING_CODE);
     setError(null);
+    setConsoleMessages([]); // Also clear console on refinement
     
     const newHistory: ChatMessage[] = [
       ...chatHistory,
@@ -100,10 +119,16 @@ function App() {
             isLoading={appState === AppState.GENERATING_CODE}
           />
           {animationCode && (
-            <CodeDisplay 
-              code={animationCode}
-              isLoading={isLoading}
-            />
+            <React.Fragment>
+              <CodeDisplay 
+                code={animationCode}
+                isLoading={isLoading}
+              />
+              <ConsoleDisplay 
+                messages={consoleMessages}
+                onClear={() => setConsoleMessages([])}
+              />
+            </React.Fragment>
           )}
         </div>
 

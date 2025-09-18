@@ -12,3 +12,9 @@ export interface ChatMessage {
   role: 'user' | 'model';
   parts: [{ text: string }];
 }
+
+// FIX: Define and export the ConsoleMessage interface for displaying logs from the p5.js iframe.
+export interface ConsoleMessage {
+  level: 'log' | 'warn' | 'error' | 'info';
+  message: string;
+}
