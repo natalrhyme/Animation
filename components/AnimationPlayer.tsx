@@ -4,6 +4,7 @@ import { AppState } from '../types';
 interface AnimationPlayerProps {
   appState: AppState;
   animationCode: string;
+  script: string;
   error: string | null;
   isFullscreen: boolean;
   setIsFullscreen: (isFullscreen: boolean) => void;
@@ -29,6 +30,16 @@ const ExitFullscreenIcon: React.FC = () => (
 const DownloadIcon: React.FC = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+    </svg>
+);
+const SpeakerOnIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.414z" clipRule="evenodd" />
+    </svg>
+);
+const SpeakerOffIcon: React.FC = () => (
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM12.293 7.293a1 1 0 011.414 0L15 8.586l1.293-1.293a1 1 0 111.414 1.414L16.414 10l1.293 1.293a1 1 0 01-1.414 1.414L15 11.414l-1.293 1.293a1 1 0 01-1.414-1.414L13.586 10l-1.293-1.293a1 1 0 010-1.414z" clipRule="evenodd" />
     </svg>
 );
 // --- END ICONS ---
@@ -228,10 +239,29 @@ const ExportMenu: React.FC<{ onSelect: (config: RecordConfig) => void }> = ({ on
 }
 
 
-const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ appState, animationCode, error, isFullscreen, setIsFullscreen }) => {
+const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ appState, animationCode, script, error, isFullscreen, setIsFullscreen }) => {
   const [showExportMenu, setShowExportMenu] = useState(false);
   const [recordConfig, setRecordConfig] = useState<RecordConfig | null>(null);
+  const [isMuted, setIsMuted] = useState(false);
   const exportMenuRef = useRef<HTMLDivElement>(null);
+
+  // Speech synthesis logic
+  useEffect(() => {
+    const cleanup = () => {
+      if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+      }
+    };
+    
+    if (appState === AppState.DONE && script && !isMuted) {
+      cleanup();
+      
+      const utterance = new SpeechSynthesisUtterance(script);
+      window.speechSynthesis.speak(utterance);
+    }
+
+    return cleanup;
+  }, [script, appState, isMuted]);
 
   const handleStartRecording = (config: RecordConfig) => {
       setShowExportMenu(false);
@@ -278,6 +308,13 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ appState, animationCo
           <div ref={exportMenuRef} className="absolute bottom-3 right-3 flex items-center gap-2 z-10">
             {showExportMenu && <ExportMenu onSelect={handleStartRecording} />}
             <button
+              onClick={() => setIsMuted(!isMuted)}
+              className="p-2 bg-gray-700 bg-opacity-50 hover:bg-opacity-100 hover:bg-gray-600 rounded-md text-gray-300 transition-all"
+              aria-label={isMuted ? 'Unmute narration' : 'Mute narration'}
+            >
+              {isMuted ? <SpeakerOffIcon /> : <SpeakerOnIcon />}
+            </button>
+            <button
                 onClick={() => setShowExportMenu(!showExportMenu)}
                 className="p-2 bg-gray-700 bg-opacity-50 hover:bg-opacity-100 hover:bg-gray-600 rounded-md text-gray-300 transition-all"
                 aria-label="Download animation"
@@ -294,6 +331,14 @@ const AnimationPlayer: React.FC<AnimationPlayerProps> = ({ appState, animationCo
           </div>
         )}
       </div>
+      {script && !isFullscreen && (
+        <div className="mt-[-1rem]">
+          <h3 className="text-md font-semibold text-gray-400 mb-2">Narration Script</h3>
+          <p className="bg-gray-800 border border-gray-700 rounded-lg p-3 text-sm text-gray-300 italic">
+            "{script}"
+          </p>
+        </div>
+      )}
     </div>
   );
 };

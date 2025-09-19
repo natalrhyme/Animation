@@ -11,6 +11,7 @@ import { AppState, ChatMessage, ConsoleMessage } from './types';
 function App() {
   const [prompt, setPrompt] = useState('');
   const [animationCode, setAnimationCode] = useState('');
+  const [script, setScript] = useState('');
   const [chatMessage, setChatMessage] = useState('');
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
@@ -39,23 +40,25 @@ function App() {
     setAppState(AppState.GENERATING_CODE);
     setError(null);
     setAnimationCode('');
+    setScript('');
     setChatHistory([]); // Reset chat history
     setChatMessage('');
     setConsoleMessages([]); // Reset console messages
 
     try {
-      const code = await generateAnimationCode(prompt);
+      const { code, script } = await generateAnimationCode(prompt);
       if (code.startsWith('// Error')) {
         throw new Error(code);
       }
       setAnimationCode(code);
+      setScript(script);
       // Prime the chat history so the model knows what code it's working with.
       setChatHistory([{
         role: 'user',
         parts: [{ text: `Generate a p5.js animation for the following prompt: ${prompt}` }]
       }, {
         role: 'model',
-        parts: [{ text: code }]
+        parts: [{ text: JSON.stringify({ code, script }) }]
       }]);
       setAppState(AppState.DONE);
     } catch (e) {
@@ -81,12 +84,13 @@ function App() {
     setChatMessage('');
 
     try {
-      const refinedCode = await refineCodeWithChat(chatMessage, animationCode, chatHistory);
+      const { code: refinedCode, script: refinedScript } = await refineCodeWithChat(chatMessage, animationCode, script, chatHistory);
       if (refinedCode.startsWith('// Error')) {
         throw new Error(refinedCode);
       }
       setAnimationCode(refinedCode);
-      setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: refinedCode }] }]);
+      setScript(refinedScript);
+      setChatHistory(prev => [...prev, { role: 'model', parts: [{ text: JSON.stringify({ code: refinedCode, script: refinedScript }) }] }]);
       setAppState(AppState.DONE);
     } catch (e) {
       const errorMessage = e instanceof Error ? e.message : 'An unknown error occurred.';
@@ -94,7 +98,7 @@ function App() {
       setAppState(AppState.ERROR);
       console.error(e);
     }
-  }, [chatMessage, animationCode, chatHistory]);
+  }, [chatMessage, animationCode, script, chatHistory]);
 
   const isLoading = appState === AppState.GENERATING_CODE || appState === AppState.REFINING_CODE;
 
@@ -137,6 +141,7 @@ function App() {
           <AnimationPlayer
             appState={appState}
             animationCode={animationCode}
+            script={script}
             error={error}
             isFullscreen={isFullscreen}
             setIsFullscreen={setIsFullscreen}
@@ -159,6 +164,7 @@ function App() {
           <AnimationPlayer
               appState={appState}
               animationCode={animationCode}
+              script={script}
               error={error}
               isFullscreen={isFullscreen}
               setIsFullscreen={setIsFullscreen}
